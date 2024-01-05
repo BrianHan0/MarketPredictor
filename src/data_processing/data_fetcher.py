@@ -1,36 +1,24 @@
-import requests
-import json
+import yfinance as yf
 import os
-import datetime
-from contourpy.util import data
+import pandas as pd
 
 
-
-def get_stock_data(symbol,api_key):
-    # Endpoint URL
-    url = f'https://cloud.iexapis.com/stable/stock/{symbol}/quote?token={api_key}'
-
-    # Make the request
-    response = requests.get(url)
-    # Check if the request was successful
-    if response.status_code == 200:
-        data = response.json()
-        return data
+# Fetching the data from yahoo finance
+# If it already exists just read the data from it
+def get_stock_data(symbol):
+    filepath = "../../data/"f"{symbol}.csv"
+    if (os.path.exists(filepath)):
+        data = pd.read_csv(f"../../data/{symbol}.csv", index_col=0)
     else:
-        return "Error fetching data"
+        data = yf.Ticker(symbol)
+        data = data.history(period="max")
+        data.to_csv(f"../../data/{symbol}.csv")
+        # Cleaning the data
+        del data["Dividends"]
+        del data["Stock Splits"]
+        data["Tomorrow"] = data["Close"].shift(-1)
+        data["Target"] = (data["Tomorrow"] > data["Close"]).astype(int)
+        # Deleting all data before 2010
+        data = data.loc["2010-01-01":].copy()
 
-# Cleans the stock data so it is easier to read
-def clean_stock_data(data):
-    return None
-
-def save_stock_data(stock_data,symbol):
-    output_directory = '../data'
-    output_file_name = f'{symbol}_stock_data.json'
-    output_file_path = os.path.join(output_directory, output_file_name)
-
-    if not os.path.exists(output_directory):
-        os.makedirs(output_directory)
-
-    with open(output_file_path, 'w') as file:
-        json.dump(stock_data,file)
-
+    return data
